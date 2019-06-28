@@ -22,6 +22,7 @@ pub struct EventLoopRunnerAsync<E: 'static> {
 struct SharedState<E: 'static> {
     next_event: Option<Event<E>>,
     control_flow: Option<ptr::NonNull<ControlFlow>>,
+    eat_async_events: bool,
 }
 
 #[must_use]
@@ -41,6 +42,7 @@ pub enum EventAsync<E: 'static> {
         event: DeviceEvent,
     },
     UserEvent(E),
+    Suspended(bool),
 }
 
 pub trait EventLoopAsync {
@@ -62,6 +64,7 @@ impl<E: 'static> EventLoopAsync for EventLoop<E> {
         let shared_state = Rc::new(RefCell::new(SharedState {
             next_event: None,
             control_flow: None,
+            eat_async_events: false,
         }));
         let shared_state_clone = shared_state.clone();
         let mut future = Box::pin(async move {
@@ -108,8 +111,8 @@ impl<E> EventLoopRunnerAsync<E> {
         }
     }
 
-    pub fn poll(&mut self) -> future::PollFuture<'_, E> {
-        future::PollFuture {
+    pub fn recv_events(&mut self) -> impl '_ + Future<Output=future::EventReceiver<'_, E>> {
+        future::EventReceiverBuilder {
             shared_state: &self.shared_state,
         }
     }
