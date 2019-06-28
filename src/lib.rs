@@ -23,6 +23,7 @@ struct SharedState<E: 'static> {
     next_event: Option<Event<E>>,
     control_flow: Option<ptr::NonNull<ControlFlow>>,
     eat_async_events: bool,
+    eat_redraw_events: bool,
 }
 
 #[must_use]
@@ -42,7 +43,8 @@ pub enum EventAsync<E: 'static> {
         event: DeviceEvent,
     },
     UserEvent(E),
-    Suspended(bool),
+    Suspended,
+    Resumed,
 }
 
 pub trait EventLoopAsync {
@@ -53,7 +55,7 @@ pub trait EventLoopAsync {
         Fu: Future<Output=()>;
 }
 
-impl<E: 'static> EventLoopAsync for EventLoop<E> {
+impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
     type Event = E;
 
     fn run_async<Fn, Fu>(self, event_handler: Fn) -> !
@@ -65,6 +67,7 @@ impl<E: 'static> EventLoopAsync for EventLoop<E> {
             next_event: None,
             control_flow: None,
             eat_async_events: false,
+            eat_redraw_events: false,
         }));
         let shared_state_clone = shared_state.clone();
         let mut future = Box::pin(async move {
@@ -78,6 +81,7 @@ impl<E: 'static> EventLoopAsync for EventLoop<E> {
         self.run(move |event, _, control_flow| {
             let control_flow_ptr = control_flow as *mut ControlFlow;
             drop(control_flow);
+            println!("\t{:?}", event);
             {
                 let mut shared_state = shared_state.borrow_mut();
                 shared_state.control_flow = ptr::NonNull::new(control_flow_ptr);

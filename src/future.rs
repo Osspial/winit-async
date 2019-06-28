@@ -61,7 +61,6 @@ macro_rules! eat_async_events {
             Some(Event::WindowEvent{..}) |
             Some(Event::DeviceEvent{..}) |
             Some(Event::UserEvent(_)) => {
-                println!("eat event");
                 $shared_state.next_event = None;
                 return Poll::Pending;
             },
@@ -144,8 +143,14 @@ impl<'el, E> Future for EventReceiverBuilder<'el, E> {
         if shared_state.eat_async_events {
             eat_async_events!(shared_state);
         }
+        if shared_state.eat_redraw_events {
+            if let Some(Event::WindowEvent{event: WindowEvent::RedrawRequested, ..}) = shared_state.next_event {
+                shared_state.next_event = None;
+                return Poll::Pending;
+            }
+        }
+
         match shared_state.next_event {
-            Some(Event::WindowEvent{event: WindowEvent::RedrawRequested, ..}) |
             Some(Event::NewEvents(_)) |
             None => {
                 shared_state.next_event = None;
@@ -153,6 +158,7 @@ impl<'el, E> Future for EventReceiverBuilder<'el, E> {
             },
             _ => {
                 shared_state.eat_async_events = true;
+                shared_state.eat_redraw_events = true;
                 Poll::Ready(EventReceiver{ shared_state: self.shared_state })
             }
         }
@@ -192,7 +198,8 @@ impl<E> Future for PollFuture<'_, E> {
                 Event::WindowEvent{window_id, event} => Poll::Ready(Some(EventAsync::WindowEvent{window_id, event})),
                 Event::DeviceEvent{device_id, event} => Poll::Ready(Some(EventAsync::DeviceEvent{device_id, event})),
                 Event::UserEvent(event) => Poll::Ready(Some(EventAsync::UserEvent(event))),
-                Event::Suspended(s) => Poll::Ready(Some(EventAsync::Suspended(s))),
+                Event::Suspended => Poll::Ready(Some(EventAsync::Suspended)),
+                Event::Resumed => Poll::Ready(Some(EventAsync::Resumed)),
                 Event::NewEvents(_) => Poll::Pending,
                 Event::LoopDestroyed => unreachable!(),
             },
@@ -234,10 +241,12 @@ impl<'el, E> Future for RedrawRequestFuture<'el, E> {
 
     fn poll(self: Pin<&mut Self>, _: &mut Context) -> Poll<Option<WindowId>> {
         let mut shared_state = self.shared_state.borrow_mut();
-        shared_state.eat_async_events = false;
         match shared_state.next_event {
             Some(Event::EventsCleared) |
-            Some(Event::NewEvents(_)) => Poll::Ready(None),
+            Some(Event::NewEvents(_)) => {
+                shared_state.eat_redraw_events = false;
+                Poll::Ready(None)
+            },
             Some(Event::WindowEvent{window_id, event: WindowEvent::RedrawRequested}) => {
                 shared_state.next_event = None;
                 Poll::Ready(Some(window_id))

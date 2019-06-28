@@ -28,6 +28,8 @@ fn main() {
                 }
             }
 
+            window.request_redraw();
+
             let mut redraw_requests = recv_events.redraw_requests().await;
             while let Some(window_id) = redraw_requests.next().await {
                 println!("redraw {:?}", window_id);
