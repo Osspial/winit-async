@@ -5,11 +5,12 @@ use winit::{
 };
 use crate::EventAsync;
 
-pub trait EventSink<'a, E: 'static> {
+pub trait EventSink<'a> {
+    type Event: 'static;
     type DispatchEvent: 'a + Future<Output=()>;
     type DispatchRedraw: 'a + Future<Output=()>;
     type TryWait: 'a + Future<Output=()>;
-    fn dispatch_event(&'a mut self, event: EventAsync<E>) -> Self::DispatchEvent;
+    fn dispatch_event(&'a mut self, event: EventAsync<Self::Event>) -> Self::DispatchEvent;
     fn dispatch_redraw(&'a mut self, window: WindowId) -> Self::DispatchRedraw;
     fn try_wait(&'a mut self) -> Self::TryWait;
 }
@@ -21,7 +22,7 @@ pub async fn async_driver<E, EFn, EFu, ESk>(
     where E: 'static,
           EFn: FnMut() -> EFu,
           EFu: Future<Output=Event<E>>,
-          ESk: for<'a> EventSink<'a, E>,
+          ESk: for<'a> EventSink<'a, Event=E>,
 {
     let mut next_event = event_source;
     match next_event().await {

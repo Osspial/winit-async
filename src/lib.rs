@@ -21,10 +21,37 @@ pub struct EventLoopRunnerAsync<E: 'static> {
 }
 
 struct SharedState<E: 'static> {
-    next_event: Option<Event<E>>,
+    next_event: Option<AsyncDriverEvent<E>>,
     control_flow: Option<ptr::NonNull<ControlFlow>>,
-    eat_async_events: bool,
-    eat_redraw_events: bool,
+}
+
+enum AsyncDriverEvent<E> {
+    Event(EventAsync<E>),
+    Redraw(WindowId),
+    TryWait,
+}
+
+struct AsyncEventSink<E: 'static, F: Future<Output=()>> {
+    shared_state: Rc<RefCell<SharedState<E>>>,
+    winit_event: Rc<RefCell<Option<Event<E>>>>,
+    event_dest: F,
+}
+
+impl<'a, E> async_driver::EventSink<'a> for AsyncEventSink<E> {
+    type Event = E;
+    type DispatchEvent = dyn Future<Output=()>;
+    type DispatchRedraw = dyn Future<Output=()>;
+    type TryWait = dyn Future<Output=()>;
+
+    fn dispatch_event(&'a mut self, event: EventAsync<Self::Event>) -> Self::DispatchEvent {
+        unimplemented!()
+    }
+    fn dispatch_redraw(&'a mut self, window: WindowId) -> Self::DispatchRedraw
+        unimplemented!()
+    }
+    fn try_wait(&'a mut self) -> Self::TryWait {
+        unimplemented!()
+    }
 }
 
 #[must_use]
@@ -67,10 +94,12 @@ impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
         let shared_state = Rc::new(RefCell::new(SharedState {
             next_event: None,
             control_flow: None,
-            eat_async_events: false,
-            eat_redraw_events: false,
         }));
         let shared_state_clone = shared_state.clone();
+
+        let winit_event: Rc<RefCell<Option<Event<E>>>> = Rc::new(RefCell::new(None));
+        let winit_event_cloned = winit_event.clone();
+
         let mut future = Box::pin(async move {
             let runner = EventLoopRunnerAsync {
                 shared_state: shared_state_clone,
@@ -86,7 +115,6 @@ impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
             {
                 let mut shared_state = shared_state.borrow_mut();
                 shared_state.control_flow = ptr::NonNull::new(control_flow_ptr);
-                shared_state.next_event = Some(event);
             }
 
             if unsafe{ *control_flow_ptr } != ControlFlow::Exit {
