@@ -13,8 +13,6 @@ fn main() {
 
     event_loop.run_async(async move |mut runner| {
         'main: loop {
-            runner.wait().await;
-
             let mut recv_events = runner.recv_events().await;
             while let Some(event) = recv_events.next().await {
                 match event {
@@ -24,7 +22,7 @@ fn main() {
                     } => {
                         break 'main;
                     },
-                    _ => println!("{:?}", event),
+                    _ => println!("\t{:?}", event),
                 }
             }
 
@@ -32,7 +30,7 @@ fn main() {
 
             let mut redraw_requests = recv_events.redraw_requests().await;
             while let Some(window_id) = redraw_requests.next().await {
-                println!("redraw {:?}", window_id);
+                println!("\tredraw {:?}", window_id);
             }
             println!();
         }
