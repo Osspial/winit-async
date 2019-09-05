@@ -1,11 +1,10 @@
-#![feature(async_await)]
+#![feature(async_await, async_closure)]
 use winit::{
     event::{WindowEvent},
     event_loop::EventLoop,
     window::WindowBuilder,
 };
 use winit_async::{EventLoopAsync, EventAsync as Event};
-use std::time::{Instant, Duration};
 
 fn main() {
     let event_loop = EventLoop::new();
