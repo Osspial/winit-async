@@ -7,4 +7,4 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-winit = {git = "https://github.com/rust-windowing/winit", branch="redraw-requested-2.0"}
+winit = "0.22.2"
