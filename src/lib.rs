@@ -14,12 +14,12 @@ use winit::{
     window::WindowId,
 };
 
-pub struct EventLoopRunnerAsync<'ev, E: 'static> {
-    shared_state: Rc<RefCell<SharedState<'ev, E>>>,
+pub struct EventLoopRunnerAsync<E: 'static> {
+    shared_state: Rc<RefCell<SharedState<E>>>,
 }
 
-struct SharedState<'ev, E: 'static> {
-    next_event: Option<Event<'ev, E>>,
+struct SharedState<E: 'static> {
+    next_event: Option<Event<'static, E>>,
     control_flow: Option<ptr::NonNull<ControlFlow>>,
 }
 
@@ -29,11 +29,11 @@ pub enum WaitCanceledCause {
     EventsReceived,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum EventAsync<'ev, E: 'static> {
+#[derive(Clone, Debug, PartialEq)]
+pub enum EventAsync<E: 'static> {
     WindowEvent {
         window_id: WindowId,
-        event: WindowEvent<'ev>,
+        event: WindowEvent<'static>,
     },
     DeviceEvent {
         device_id: DeviceId,
@@ -60,7 +60,7 @@ impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
         Fn: 'static + FnOnce(EventLoopRunnerAsync<E>) -> Fu,
         Fu: Future<Output = ()>,
     {
-        let shared_state = Rc::new(RefCell::new(SharedState::<'_, E> {
+        let shared_state = Rc::new(RefCell::new(SharedState {
             next_event: None,
             control_flow: None,
         }));
@@ -98,23 +98,21 @@ impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
     }
 }
 
-impl<'a, 'ev, E> EventLoopRunnerAsync<'ev, E> {
-    pub fn wait(&'a mut self) -> future::WaitFuture<'a, 'ev, E> {
+impl<E> EventLoopRunnerAsync<E> {
+    pub fn wait(&mut self) -> future::WaitFuture<'_, E> {
         future::WaitFuture {
             shared_state: &self.shared_state,
         }
     }
 
-    pub fn wait_until(&'a mut self, timeout: Instant) -> future::WaitUntilFuture<'a, 'ev, E> {
+    pub fn wait_until(&mut self, timeout: Instant) -> future::WaitUntilFuture<'_, E> {
         future::WaitUntilFuture {
             timeout,
             shared_state: &self.shared_state,
         }
     }
 
-    pub fn recv_events(
-        &'a mut self,
-    ) -> impl 'a + Future<Output = future::EventReceiver<'a, 'ev, E>> {
+    pub fn recv_events(&mut self) -> impl '_ + Future<Output = future::EventReceiver<'_, E>> {
         future::EventReceiverBuilder {
             shared_state: &self.shared_state,
         }
