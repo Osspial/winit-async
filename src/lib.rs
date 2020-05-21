@@ -1,4 +1,3 @@
-#![feature(async_await)]
 pub mod future;
 
 use std::{
@@ -10,7 +9,7 @@ use std::{
     time::Instant,
 };
 use winit::{
-    event::{Event, DeviceEvent, DeviceId, WindowEvent},
+    event::{DeviceEvent, DeviceId, Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowId,
 };
@@ -20,7 +19,7 @@ pub struct EventLoopRunnerAsync<E: 'static> {
 }
 
 struct SharedState<E: 'static> {
-    next_event: Option<Event<E>>,
+    next_event: Option<Event<'static, E>>,
     control_flow: Option<ptr::NonNull<ControlFlow>>,
 }
 
@@ -34,7 +33,7 @@ pub enum WaitCanceledCause {
 pub enum EventAsync<E: 'static> {
     WindowEvent {
         window_id: WindowId,
-        event: WindowEvent,
+        event: WindowEvent<'static>,
     },
     DeviceEvent {
         device_id: DeviceId,
@@ -50,7 +49,7 @@ pub trait EventLoopAsync {
     fn run_async<Fn, Fu>(self, event_handler: Fn) -> !
     where
         Fn: 'static + FnOnce(EventLoopRunnerAsync<Self::Event>) -> Fu,
-        Fu: Future<Output=()>;
+        Fu: Future<Output = ()>;
 }
 
 impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
@@ -59,7 +58,7 @@ impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
     fn run_async<Fn, Fu>(self, event_handler: Fn) -> !
     where
         Fn: 'static + FnOnce(EventLoopRunnerAsync<E>) -> Fu,
-        Fu: Future<Output=()>
+        Fu: Future<Output = ()>,
     {
         let shared_state = Rc::new(RefCell::new(SharedState {
             next_event: None,
@@ -72,7 +71,7 @@ impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
             };
             event_handler(runner).await
         });
-        let waker = unsafe{ Waker::from_raw(null_waker()) };
+        let waker = unsafe { Waker::from_raw(null_waker()) };
 
         self.run(move |event, _, control_flow| {
             let control_flow_ptr = control_flow as *mut ControlFlow;
@@ -80,13 +79,16 @@ impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
             {
                 let mut shared_state = shared_state.borrow_mut();
                 shared_state.control_flow = ptr::NonNull::new(control_flow_ptr);
-                shared_state.next_event = Some(event);
+
+                if let Some(event) = event.to_static() {
+                    shared_state.next_event = Some(event);
+                }
             }
 
-            if unsafe{ *control_flow_ptr } != ControlFlow::Exit {
+            if unsafe { *control_flow_ptr } != ControlFlow::Exit {
                 let mut context = Context::from_waker(&waker);
                 match future.as_mut().poll(&mut context) {
-                    Poll::Ready(()) => unsafe{ *control_flow_ptr = ControlFlow::Exit },
+                    Poll::Ready(()) => unsafe { *control_flow_ptr = ControlFlow::Exit },
                     Poll::Pending => (),
                 }
             }
@@ -110,7 +112,7 @@ impl<E> EventLoopRunnerAsync<E> {
         }
     }
 
-    pub fn recv_events(&mut self) -> impl '_ + Future<Output=future::EventReceiver<'_, E>> {
+    pub fn recv_events(&mut self) -> impl '_ + Future<Output = future::EventReceiver<'_, E>> {
         future::EventReceiverBuilder {
             shared_state: &self.shared_state,
         }
@@ -118,18 +120,10 @@ impl<E> EventLoopRunnerAsync<E> {
 }
 
 fn null_waker() -> RawWaker {
-    RawWaker::new(
-        ptr::null(),
-        VTABLE
-    )
+    RawWaker::new(ptr::null(), VTABLE)
 }
 
-const VTABLE: &RawWakerVTable = &RawWakerVTable::new(
-    null_waker_clone,
-    null_fn,
-    null_fn,
-    null_fn,
-);
+const VTABLE: &RawWakerVTable = &RawWakerVTable::new(null_waker_clone, null_fn, null_fn, null_fn);
 
 unsafe fn null_waker_clone(_: *const ()) -> RawWaker {
     null_waker()

@@ -1,16 +1,11 @@
-#![feature(async_await, async_closure)]
-use winit::{
-    event::{WindowEvent},
-    event_loop::EventLoop,
-    window::WindowBuilder,
-};
-use winit_async::{EventLoopAsync, EventAsync as Event};
+use winit::{event::WindowEvent, event_loop::EventLoop, window::WindowBuilder};
+use winit_async::{EventAsync as Event, EventLoopAsync};
 
 fn main() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
-    event_loop.run_async(async move |mut runner| {
+    event_loop.run_async(move |mut runner| async move {
         'main: loop {
             runner.wait().await;
 
@@ -22,7 +17,7 @@ fn main() {
                         ..
                     } => {
                         break 'main;
-                    },
+                    }
                     _ => println!("{:?}", event),
                 }
             }
