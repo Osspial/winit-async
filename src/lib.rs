@@ -69,7 +69,7 @@ impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
         
         use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
         let completion = Arc::from(AtomicBool::new(false));
-        let completion_ref = done.clone();
+        let completion_ref = completion.clone();
         
         let mut future = Box::pin(async move {
             let runner = EventLoopRunnerAsync {
