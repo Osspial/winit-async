@@ -66,11 +66,17 @@ impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
             control_flow: None,
         }));
         let shared_state_clone = shared_state.clone();
+        
+        use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
+        let completion = Arc::from(AtomicBool::new(false));
+        let completion_ref = completion.clone();
+        
         let mut future = Box::pin(async move {
             let runner = EventLoopRunnerAsync {
                 shared_state: shared_state_clone,
             };
-            event_handler(runner).await
+            event_handler(runner).await;
+            completion_ref.store(true, Ordering::Relaxed);
         });
         let waker = unsafe{ Waker::from_raw(null_waker()) };
 
@@ -85,9 +91,16 @@ impl<E: 'static + std::fmt::Debug> EventLoopAsync for EventLoop<E> {
 
             if unsafe{ *control_flow_ptr } != ControlFlow::Exit {
                 let mut context = Context::from_waker(&waker);
-                match future.as_mut().poll(&mut context) {
-                    Poll::Ready(()) => unsafe{ *control_flow_ptr = ControlFlow::Exit },
-                    Poll::Pending => (),
+                
+                if completion.load(Ordering::Relaxed) {
+                    unsafe {
+                        *control_flow_ptr = ControlFlow::Exit;
+                    }
+                } else {
+                    match future.as_mut().poll(&mut context) {
+                        Poll::Ready(()) => unsafe{ *control_flow_ptr = ControlFlow::Exit },
+                        Poll::Pending => (),
+                    }
                 }
             }
 
