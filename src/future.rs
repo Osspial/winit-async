@@ -1,8 +1,4 @@
-use crate::{
-    SharedState,
-    EventAsync,
-    WaitCanceledCause,
-};
+use crate::{EventAsync, SharedState, WaitCanceledCause};
 use std::{
     cell::RefCell,
     future::Future,
@@ -17,7 +13,7 @@ use winit::{
 };
 
 #[must_use]
-pub struct WaitFuture<'a, E: 'static>  {
+pub struct WaitFuture<'a, E: 'static> {
     pub(crate) shared_state: &'a RefCell<SharedState<E>>,
 }
 
@@ -63,23 +59,23 @@ impl<E> Future for WaitFuture<'_, E> {
     fn poll(self: Pin<&mut Self>, _: &mut Context) -> Poll<()> {
         let mut shared_state = self.shared_state.borrow_mut();
         match shared_state.next_event {
-            Some(Event::NewEvents{..}) => {
-                unsafe{ *shared_state.control_flow.unwrap().as_mut() = ControlFlow::Poll };
+            Some(Event::NewEvents { .. }) => {
+                unsafe { *shared_state.control_flow.unwrap().as_mut() = ControlFlow::Poll };
                 Poll::Ready(())
-            },
+            }
             Some(Event::RedrawEventsCleared) => {
                 unsafe{ *shared_state.control_flow.unwrap().as_mut() = ControlFlow::Wait };
                 shared_state.next_event = None;
                 Poll::Pending
-            },
-            Some(Event::WindowEvent{..}) |
-            Some(Event::DeviceEvent{..}) |
-            Some(Event::UserEvent{..}) |
-            Some(Event::MainEventsCleared) |
-            Some(Event::RedrawRequested{..}) => {
+            }
+            Some(Event::WindowEvent { .. })
+            | Some(Event::DeviceEvent { .. })
+            | Some(Event::UserEvent { .. })
+            | Some(Event::MainEventsCleared)
+            | Some(Event::RedrawRequested { .. }) => {
                 shared_state.next_event = None;
                 Poll::Pending
-            },
+            }
             Some(Event::LoopDestroyed) => unreachable!(),
             Some(Event::Suspended) |
             Some(Event::Resumed) => unimplemented!(),
@@ -95,31 +91,30 @@ impl<E> Future for WaitUntilFuture<'_, E> {
         let mut shared_state = self.shared_state.borrow_mut();
         match shared_state.next_event {
             Some(Event::NewEvents(cause)) => {
-                unsafe{ *shared_state.control_flow.unwrap().as_mut() = ControlFlow::Poll };
+                unsafe { *shared_state.control_flow.unwrap().as_mut() = ControlFlow::Poll };
                 Poll::Ready(match cause {
-                    StartCause::ResumeTimeReached{..} => WaitCanceledCause::ResumeTimeReached,
-                    StartCause::WaitCancelled{..} |
-                    StartCause::Poll |
-                    StartCause::Init => WaitCanceledCause::EventsReceived,
+                    StartCause::ResumeTimeReached { .. } => WaitCanceledCause::ResumeTimeReached,
+                    StartCause::WaitCancelled { .. } | StartCause::Poll | StartCause::Init => {
+                        WaitCanceledCause::EventsReceived
+                    }
                 })
-            },
+            }
             Some(Event::RedrawEventsCleared) => {
-                unsafe{ *shared_state.control_flow.unwrap().as_mut() = ControlFlow::WaitUntil(self.timeout) };
+                unsafe { *shared_state.control_flow.unwrap().as_mut() = ControlFlow::WaitUntil(self.timeout) };
                 shared_state.next_event = None;
                 Poll::Pending
-            },
-            Some(Event::WindowEvent{..}) |
-            Some(Event::DeviceEvent{..}) |
-            Some(Event::UserEvent{..}) |
-            Some(Event::MainEventsCleared) |
-            Some(Event::RedrawRequested{..}) => {
+            }
+            Some(Event::WindowEvent { .. })
+            | Some(Event::DeviceEvent { .. })
+            | Some(Event::UserEvent { .. })
+            | Some(Event::MainEventsCleared)
+            | Some(Event::RedrawRequested { .. }) => {
                 shared_state.next_event = None;
                 Poll::Pending
-            },
+            }
             Some(Event::LoopDestroyed) => unreachable!(),
-            Some(Event::Suspended) |
-            Some(Event::Resumed) => unimplemented!(),
-            None => Poll::Pending
+            Some(Event::Suspended) | Some(Event::Resumed) => unimplemented!(),
+            None => Poll::Pending,
         }
     }
 }
@@ -129,30 +124,28 @@ impl<'el, E> Future for EventReceiverBuilder<'el, E> {
     fn poll(self: Pin<&mut Self>, _: &mut Context) -> Poll<EventReceiver<'el, E>> {
         let mut shared_state = self.shared_state.borrow_mut();
         match shared_state.next_event {
-            Some(Event::RedrawRequested{..}) |
-            Some(Event::RedrawEventsCleared) |
-            Some(Event::MainEventsCleared) => {
+            Some(Event::RedrawRequested { .. }) | Some(Event::RedrawEventsCleared) | Some(Event::MainEventsCleared) => {
                 shared_state.next_event = None;
                 Poll::Pending
-            },
+            }
             Some(Event::NewEvents(_)) => {
                 shared_state.next_event = None;
                 Poll::Ready(EventReceiver {
                     shared_state: self.shared_state,
                 })
-            },
-            Some(Event::WindowEvent{..}) |
-            Some(Event::DeviceEvent{..}) |
-            Some(Event::UserEvent{..}) |
-            Some(Event::LoopDestroyed) => unreachable!(),
-            Some(Event::Suspended) |
-            Some(Event::Resumed) => unimplemented!(),
-            None => Poll::Pending
+            }
+            Some(Event::WindowEvent { .. })
+            | Some(Event::DeviceEvent { .. })
+            | Some(Event::UserEvent { .. })
+            | Some(Event::LoopDestroyed) => unreachable!(),
+            Some(Event::Suspended) | Some(Event::Resumed) => unimplemented!(),
+            None => Poll::Pending,
         }
     }
 }
 
 impl<'el, E> EventReceiver<'el, E> {
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> PollFuture<'_, E> {
         PollFuture {
             shared_state: &self.shared_state,
@@ -160,7 +153,7 @@ impl<'el, E> EventReceiver<'el, E> {
         }
     }
 
-    pub fn redraw_requests(self) -> impl Future<Output=RedrawRequestReceiver<'el, E>> {
+    pub fn redraw_requests(self) -> impl Future<Output = RedrawRequestReceiver<'el, E>> {
         RedrawRequestReceiverBuilder {
             shared_state: &self.shared_state,
         }
@@ -222,6 +215,7 @@ impl<'el, E> Future for RedrawRequestReceiverBuilder<'el, E> {
 }
 
 impl<'el, E> RedrawRequestReceiver<'el, E> {
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> RedrawRequestFuture<'_, E> {
         RedrawRequestFuture {
             shared_state: &self.shared_state,
@@ -243,24 +237,22 @@ impl<'el, E> Future for RedrawRequestFuture<'el, E> {
             Some(Event::RedrawRequested(window_id)) => {
                 shared_state.next_event = None;
                 Poll::Ready(Some(window_id))
-            },
+            }
             Some(Event::RedrawEventsCleared) => {
                 self.sealed = true;
                 Poll::Ready(None)
-            },
-            Some(Event::WindowEvent{..}) |
-            Some(Event::DeviceEvent{..}) |
-            Some(Event::UserEvent{..}) |
-            Some(Event::MainEventsCleared) => {
+            }
+            Some(Event::WindowEvent { .. })
+            | Some(Event::DeviceEvent { .. })
+            | Some(Event::UserEvent { .. })
+            | Some(Event::MainEventsCleared) => {
                 shared_state.next_event = None;
                 Poll::Pending
-            },
+            }
 
-            Some(Event::NewEvents{..}) |
-            Some(Event::LoopDestroyed) => unreachable!(),
-            Some(Event::Suspended) |
-            Some(Event::Resumed) => unimplemented!(),
-            None => Poll::Pending
+            Some(Event::NewEvents { .. }) | Some(Event::LoopDestroyed) => unreachable!(),
+            Some(Event::Suspended) | Some(Event::Resumed) => unimplemented!(),
+            None => Poll::Pending,
         }
     }
 }
