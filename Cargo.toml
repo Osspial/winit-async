@@ -5,4 +5,5 @@ authors = ["Osspial <osspial@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-winit = {git = "https://github.com/rust-windowing/winit", branch="redraw-requested-2.0"}
+winit = "0.25.0"
+raw-window-handle = "0.3.3"

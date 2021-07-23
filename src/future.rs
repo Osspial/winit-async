@@ -64,7 +64,7 @@ impl<E> Future for WaitFuture<'_, E> {
                 Poll::Ready(())
             }
             Some(Event::RedrawEventsCleared) => {
-                unsafe{ *shared_state.control_flow.unwrap().as_mut() = ControlFlow::Wait };
+                unsafe { *shared_state.control_flow.unwrap().as_mut() = ControlFlow::Poll };
                 shared_state.next_event = None;
                 Poll::Pending
             }
@@ -77,9 +77,8 @@ impl<E> Future for WaitFuture<'_, E> {
                 Poll::Pending
             }
             Some(Event::LoopDestroyed) => unreachable!(),
-            Some(Event::Suspended) |
-            Some(Event::Resumed) => unimplemented!(),
-            None => Poll::Pending
+            Some(Event::Suspended) | Some(Event::Resumed) => unimplemented!(),
+            None => Poll::Pending,
         }
     }
 }
@@ -170,23 +169,25 @@ impl<E> Future for PollFuture<'_, E> {
 
         let mut shared_state = self.shared_state.borrow_mut();
         match shared_state.next_event.take() {
-            Some(Event::WindowEvent{window_id, event}) => Poll::Ready(Some(EventAsync::WindowEvent{window_id, event})),
-            Some(Event::DeviceEvent{device_id, event}) => Poll::Ready(Some(EventAsync::DeviceEvent{device_id, event})),
+            Some(Event::WindowEvent { window_id, event }) => {
+                Poll::Ready(Some(EventAsync::WindowEvent { window_id, event }))
+            }
+            Some(Event::DeviceEvent { device_id, event }) => {
+                Poll::Ready(Some(EventAsync::DeviceEvent { device_id, event }))
+            }
             Some(Event::UserEvent(event)) => Poll::Ready(Some(EventAsync::UserEvent(event))),
             Some(Event::MainEventsCleared) => {
                 self.sealed = true;
                 Poll::Ready(None)
-            },
-            event @ Some(Event::RedrawRequested{..}) |
-            event @ Some(Event::RedrawEventsCleared) => {
+            }
+            event @ Some(Event::RedrawRequested { .. }) | event @ Some(Event::RedrawEventsCleared) => {
                 shared_state.next_event = event;
                 Poll::Ready(None)
-            },
-            Some(Event::NewEvents(_)) |
-            Some(Event::LoopDestroyed) => unreachable!(),
-            Some(Event::Suspended) |
-            Some(Event::Resumed) => unimplemented!(),
-            None => Poll::Pending
+            }
+            Some(Event::NewEvents(_)) | Some(Event::LoopDestroyed) => Poll::Ready(None),
+            Some(Event::Suspended) => Poll::Ready(Some(EventAsync::Suspended)),
+            Some(Event::Resumed) => Poll::Ready(Some(EventAsync::Resumed)),
+            None => Poll::Pending,
         }
     }
 }
@@ -196,20 +197,21 @@ impl<'el, E> Future for RedrawRequestReceiverBuilder<'el, E> {
     fn poll(self: Pin<&mut Self>, _: &mut Context) -> Poll<RedrawRequestReceiver<'el, E>> {
         let mut shared_state = self.shared_state.borrow_mut();
         match shared_state.next_event {
-            Some(Event::RedrawRequested{..}) |
-            Some(Event::RedrawEventsCleared) => Poll::Ready(RedrawRequestReceiver{shared_state: self.shared_state}),
-            Some(Event::MainEventsCleared) |
-            Some(Event::WindowEvent{..}) |
-            Some(Event::DeviceEvent{..}) |
-            Some(Event::UserEvent{..}) => {
+            Some(Event::RedrawRequested { .. }) | Some(Event::RedrawEventsCleared) => {
+                Poll::Ready(RedrawRequestReceiver {
+                    shared_state: self.shared_state,
+                })
+            }
+            Some(Event::MainEventsCleared)
+            | Some(Event::WindowEvent { .. })
+            | Some(Event::DeviceEvent { .. })
+            | Some(Event::UserEvent { .. }) => {
                 shared_state.next_event = None;
                 Poll::Pending
-            },
-            Some(Event::NewEvents{..}) |
-            Some(Event::LoopDestroyed) => unreachable!(),
-            Some(Event::Suspended) |
-            Some(Event::Resumed) => unimplemented!(),
-            None => Poll::Pending
+            }
+            Some(Event::NewEvents { .. }) | Some(Event::LoopDestroyed) => unreachable!(),
+            Some(Event::Suspended) | Some(Event::Resumed) => unimplemented!(),
+            None => Poll::Pending,
         }
     }
 }
