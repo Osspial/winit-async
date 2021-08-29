@@ -147,14 +147,14 @@ impl<'el, E> EventReceiver<'el, E> {
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> PollFuture<'_, E> {
         PollFuture {
-            shared_state: &self.shared_state,
+            shared_state: self.shared_state,
             sealed: false,
         }
     }
 
     pub fn redraw_requests(self) -> impl Future<Output = RedrawRequestReceiver<'el, E>> {
         RedrawRequestReceiverBuilder {
-            shared_state: &self.shared_state,
+            shared_state: self.shared_state,
         }
     }
 }
@@ -220,7 +220,7 @@ impl<'el, E> RedrawRequestReceiver<'el, E> {
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> RedrawRequestFuture<'_, E> {
         RedrawRequestFuture {
-            shared_state: &self.shared_state,
+            shared_state: self.shared_state,
             sealed: false,
         }
     }
