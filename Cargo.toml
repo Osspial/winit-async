@@ -2,8 +2,8 @@
 name = "winit-async"
 version = "0.1.0"
 authors = ["Osspial <osspial@gmail.com>", "Longor1996 <lalongok@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-winit = "0.25.0"
-raw-window-handle = "0.3.3"
+winit = "0.26.1"
+raw-window-handle = "0.4.2"
