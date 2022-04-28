@@ -1,10 +1,9 @@
 [package]
 name = "winit-async"
 version = "0.1.0"
-authors = ["Osspial <osspial@gmail.com>"]
+authors = ["Osspial <osspial@gmail.com>", "Longor1996 <lalongok@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-winit = {git = "https://github.com/rust-windowing/winit", branch="redraw-requested-2.0"}
+winit = "0.26.1"
+raw-window-handle = "0.4.3"
